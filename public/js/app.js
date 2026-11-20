@@ -147,6 +147,137 @@
     return null;
   }
 
+  function imageUrl(imageId) {
+    if (!imageId || !state.token) {
+      return '';
+    }
+    return '/api/kitchens/' + encodeURIComponent(state.token) + '/images/' + encodeURIComponent(imageId);
+  }
+
+  function dishThumb(dish, extraClass) {
+    var cls = 'dish-emoji' + (extraClass ? ' ' + extraClass : '');
+    var src = '';
+    if (dish && dish.pendingImage) {
+      src = dish.pendingImage;
+    } else if (dish && dish.image) {
+      src = imageUrl(dish.image);
+    }
+    if (src) {
+      return '<div class="' + cls + ' dish-photo"><img src="' + esc(src) + '" alt=""></div>';
+    }
+    return '<div class="' + cls + '">' + esc((dish && dish.emoji) || '🍽️') + '</div>';
+  }
+
+  function orderItemIcon(item) {
+    if (item && item.image) {
+      return '<span class="em em-photo"><img src="' + esc(imageUrl(item.image)) + '" alt=""></span>';
+    }
+    return '<span class="em">' + esc((item && item.emoji) || '') + '</span>';
+  }
+
+  function blobToDataURL(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        resolve(reader.result);
+      };
+      reader.onerror = function () {
+        reject(new Error('读取图片失败'));
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  function loadHtmlImage(src) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        resolve(img);
+      };
+      img.onerror = function () {
+        reject(new Error('这张图片无法预览，请换一张试试'));
+      };
+      img.src = src;
+    });
+  }
+
+  function decodeImageFile(file) {
+    if (typeof createImageBitmap === 'function') {
+      return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () {
+        return createImageBitmap(file).catch(function () {
+          return blobToDataURL(file).then(loadHtmlImage);
+        });
+      });
+    }
+    return blobToDataURL(file).then(loadHtmlImage);
+  }
+
+  function canvasToJpegBlob(canvas, quality) {
+    return new Promise(function (resolve, reject) {
+      if (canvas.toBlob) {
+        canvas.toBlob(function (blob) {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('图片处理失败'));
+          }
+        }, 'image/jpeg', quality);
+        return;
+      }
+      try {
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+        var parts = String(dataUrl).split(',');
+        var bin = atob(parts[1] || '');
+        var arr = new Uint8Array(bin.length);
+        var i;
+        for (i = 0; i < bin.length; i++) {
+          arr[i] = bin.charCodeAt(i);
+        }
+        resolve(new Blob([arr], { type: 'image/jpeg' }));
+      } catch (err) {
+        reject(new Error('图片处理失败'));
+      }
+    });
+  }
+
+  function compressImage(file) {
+    if (!file) {
+      return Promise.reject(new Error('请先选择一张图片'));
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      return Promise.reject(new Error('图片太大了，请换一张小一点的'));
+    }
+    return decodeImageFile(file).then(function (img) {
+      var w = img.width;
+      var h = img.height;
+      if (!w || !h) {
+        throw new Error('这张图片无法预览，请换一张试试');
+      }
+      var scale = Math.min(1, 800 / Math.max(w, h));
+      var cw = Math.max(1, Math.round(w * scale));
+      var ch = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      if (img.close) {
+        img.close();
+      }
+      function encode(quality) {
+        return canvasToJpegBlob(canvas, quality).then(function (blob) {
+          if (blob.size > 200 * 1024 && quality > 0.5) {
+            return encode(Math.max(0.5, quality - 0.1));
+          }
+          return blobToDataURL(blob);
+        });
+      }
+      return encode(0.8);
+    });
+  }
+
   function cartView() {
     var items = (state.cart && state.cart.items) || [];
     var result = [];
@@ -158,6 +289,7 @@
           id: dish.id,
           name: dish.name,
           emoji: dish.emoji,
+          image: dish.image || '',
           time: dish.time,
           difficulty: dish.difficulty,
           quantity: items[i].quantity
@@ -352,7 +484,7 @@
   function dishCard(dish, withStepper) {
     var qty = cartQty(dish.id);
     var html = '<div class="card dish" data-act="detail" data-id="' + esc(dish.id) + '">';
-    html += '<div class="dish-emoji">' + esc(dish.emoji || '🍽️') + '</div>';
+    html += dishThumb(dish);
     html += '<div class="dish-main">';
     html += '<div class="dish-name">' + esc(dish.name) + '</div>';
     html += '<div class="dish-desc">' + esc(dish.desc || '') + '</div>';
@@ -516,7 +648,7 @@
       html += '<span class="tag ' + (order.status === 'done' ? 'tag-done' : 'tag-pending') + '">' + (order.status === 'done' ? '做好啦' : '待做') + '</span></div>';
       html += '<div class="order-items">';
       for (j = 0; j < (order.items || []).length; j++) {
-        html += '<div class="order-item"><span class="em">' + esc(order.items[j].emoji) + '</span><span class="nm">' + esc(order.items[j].name) + '</span><span class="qt">×' + esc(order.items[j].quantity) + '</span></div>';
+        html += '<div class="order-item">' + orderItemIcon(order.items[j]) + '<span class="nm">' + esc(order.items[j].name) + '</span><span class="qt">×' + esc(order.items[j].quantity) + '</span></div>';
       }
       html += '</div>';
       if (order.notes) {
@@ -558,7 +690,7 @@
     for (i = 0; i < state.dishes.length; i++) {
       dish = state.dishes[i];
       html += '<div class="card row" data-act="detail" data-id="' + esc(dish.id) + '">';
-      html += '<div class="dish-emoji">' + esc(dish.emoji || '🍽️') + '</div>';
+      html += dishThumb(dish);
       html += '<div class="dish-main"><div class="dish-name">' + esc(dish.name) + '</div>';
       html += '<div class="dish-desc">' + esc(dish.category) + ' · ' + esc(dish.difficulty) + ' · ' + esc(dish.time) + ' 分钟</div></div>';
       html += '<div class="row-actions">';
@@ -583,7 +715,11 @@
     var html = '<div class="overlay" id="overlay-detail">';
     html += '<div class="overlay-bar"><button type="button" data-act="close-detail">返回</button><h2>菜谱详情</h2><button type="button" data-act="edit" data-id="' + esc(dish.id) + '">编辑</button></div>';
     html += '<div class="page has-footer">';
-    html += '<div class="card head-center"><div class="head-emoji">' + esc(dish.emoji) + '</div>';
+    if (dish.image) {
+      html += '<div class="card head-center"><div class="head-photo"><img src="' + esc(imageUrl(dish.image)) + '" alt=""></div>';
+    } else {
+      html += '<div class="card head-center"><div class="head-emoji">' + esc(dish.emoji || '🍽️') + '</div>';
+    }
     html += '<div class="hero-title">' + esc(dish.name) + '</div>';
     html += '<p class="hero-sub">' + esc(dish.desc || '') + '</p>';
     html += '<div class="mt-12"><span class="tag">' + esc(dish.category) + '</span> <span class="tag">' + esc(dish.difficulty) + '</span> <span class="tag">⏱ ' + esc(dish.time) + ' 分钟</span></div></div>';
@@ -621,13 +757,28 @@
     html += '<div class="page form-page has-footer">';
     html += '<div class="card">';
     html += '<div class="field"><label class="field-label">菜名</label><input class="input" id="edit-name" maxlength="20" placeholder="例如：番茄炒蛋" value="' + esc(dish.name || '') + '"></div>';
-    html += '<div class="row-2"><div class="field"><label class="field-label">表情</label><input class="input" id="edit-emoji" maxlength="4" placeholder="🍅" value="' + esc(dish.emoji || '🍽️') + '"></div>';
+    var previewSrc = dish.pendingImage ? dish.pendingImage : (!dish.imageCleared && dish.image ? imageUrl(dish.image) : '');
+    html += '<div class="field"><label class="field-label">图片</label><div class="photo-picker">';
+    html += '<div class="photo-preview" id="edit-photo-preview">';
+    if (previewSrc) {
+      html += '<img src="' + esc(previewSrc) + '" alt="预览">';
+    } else {
+      html += '<span>' + esc(dish.emoji || '📷') + '</span>';
+    }
+    html += '</div><div class="photo-actions">';
+    html += '<button class="btn btn-ghost btn-inline" type="button" data-act="pick-photo">' + (previewSrc ? '更换图片' : '选择图片') + '</button>';
+    if (previewSrc) {
+      html += '<button class="link muted" type="button" data-act="clear-photo">去掉图片</button>';
+    }
+    html += '<div class="photo-hint">可从相册选择或拍照</div>';
+    html += '</div></div>';
+    html += '<input class="hidden" type="file" id="edit-photo" accept="image/*"></div>';
     html += '<div class="field"><label class="field-label">分类</label><select class="input picker" id="edit-category">';
     var i;
     for (i = 0; i < DISH_CATEGORIES.length; i++) {
       html += '<option value="' + esc(DISH_CATEGORIES[i]) + '"' + (dish.category === DISH_CATEGORIES[i] ? ' selected' : '') + '>' + esc(DISH_CATEGORIES[i]) + '</option>';
     }
-    html += '</select></div></div>';
+    html += '</select></div>';
     html += '<div class="field"><label class="field-label">一句话介绍</label><input class="input" id="edit-desc" maxlength="40" placeholder="例如：经典家常，酸甜开胃" value="' + esc(dish.desc || '') + '"></div>';
     html += '<div class="row-2"><div class="field"><label class="field-label">难度</label><select class="input picker" id="edit-difficulty">';
     for (i = 0; i < DIFFICULTIES.length; i++) {
@@ -741,6 +892,28 @@
     if (code) {
       code.addEventListener('input', function () {
         state.joinCode = String(code.value || '').toUpperCase();
+      });
+    }
+    var photo = $('edit-photo');
+    if (photo) {
+      photo.addEventListener('change', function () {
+        var file = photo.files && photo.files[0];
+        photo.value = '';
+        if (!file) {
+          return;
+        }
+        state.editing = collectEdit();
+        showToast('正在处理图片…');
+        compressImage(file).then(function (dataUrl) {
+          if (!state.editing) {
+            return;
+          }
+          state.editing.pendingImage = dataUrl;
+          state.editing.imageCleared = false;
+          render();
+        }).catch(function (err) {
+          showToast(err.message || '图片处理失败');
+        });
       });
     }
   }
@@ -890,9 +1063,12 @@
       }).filter(Boolean);
     }
     return {
-      id: state.editing && state.editing.id ? state.editing.id : 'dish-' + Date.now(),
+      id: (state.editing && state.editing.id) ? state.editing.id : 'dish-' + Date.now(),
       name: val('edit-name'),
-      emoji: val('edit-emoji'),
+      emoji: (state.editing && state.editing.emoji) || '🍽️',
+      image: (state.editing && state.editing.imageCleared) ? '' : ((state.editing && state.editing.image) || ''),
+      pendingImage: (state.editing && state.editing.pendingImage) || '',
+      imageCleared: !!(state.editing && state.editing.imageCleared),
       category: val('edit-category'),
       desc: val('edit-desc'),
       difficulty: val('edit-difficulty'),
@@ -1032,12 +1208,30 @@
       });
       return;
     }
+    if (act === 'pick-photo') {
+      var input = $('edit-photo');
+      if (input) {
+        input.click();
+      }
+      return;
+    }
+    if (act === 'clear-photo') {
+      state.editing = collectEdit();
+      state.editing.pendingImage = '';
+      state.editing.image = '';
+      state.editing.imageCleared = true;
+      render();
+      return;
+    }
     if (act === 'edit' || act === 'edit-new') {
       if (act === 'edit-new') {
         state.editing = {
           id: 'dish-' + Date.now(),
           name: '',
           emoji: '🍽️',
+          image: '',
+          pendingImage: '',
+          imageCleared: false,
           category: '家常菜',
           desc: '',
           difficulty: '简单',
@@ -1046,7 +1240,21 @@
           steps: []
         };
       } else {
-        state.editing = findDish(id) || { id: id };
+        var found = findDish(id) || { id: id };
+        state.editing = {
+          id: found.id,
+          name: found.name || '',
+          emoji: found.emoji || '🍽️',
+          image: found.image || '',
+          pendingImage: '',
+          imageCleared: false,
+          category: found.category || '家常菜',
+          desc: found.desc || '',
+          difficulty: found.difficulty || '简单',
+          time: found.time || 20,
+          ingredients: found.ingredients || [],
+          steps: found.steps || []
+        };
       }
       render();
       return;
@@ -1067,10 +1275,33 @@
         return;
       }
       state.busy = true;
-      render();
-      /* render 会重绘表单，先把值写回 editing 避免丢失：collect 已经拿到了 */
       state.editing = dish;
-      request('POST', '/api/kitchens/' + encodeURIComponent(state.token) + '/dishes', dish).then(function (data) {
+      render();
+      var upload = Promise.resolve(dish.image || '');
+      if (dish.pendingImage) {
+        upload = request('POST', '/api/kitchens/' + encodeURIComponent(state.token) + '/images', {
+          image: dish.pendingImage
+        }).then(function (data) {
+          return data && data.id ? data.id : '';
+        });
+      }
+      upload.then(function (imageId) {
+        var payload = {
+          id: dish.id,
+          name: dish.name,
+          emoji: dish.emoji,
+          category: dish.category,
+          desc: dish.desc,
+          difficulty: dish.difficulty,
+          time: dish.time,
+          ingredients: dish.ingredients,
+          steps: dish.steps
+        };
+        if (imageId) {
+          payload.image = imageId;
+        }
+        return request('POST', '/api/kitchens/' + encodeURIComponent(state.token) + '/dishes', payload);
+      }).then(function (data) {
         state.busy = false;
         applyPayload(data);
         state.editing = null;

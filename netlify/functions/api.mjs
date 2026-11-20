@@ -25,6 +25,10 @@ export default async (req, context) => {
       ip: (context && context.ip) || req.headers.get('x-nf-client-connection-ip') || 'unknown',
       origin: url.origin
     }, store)
+    if (result && result.raw) {
+      const headers = Object.assign({}, result.headers || {})
+      return new Response(result.body, { status: result.status, headers })
+    }
     const headers = Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, result.headers || {})
     return new Response(JSON.stringify(result.body), { status: result.status, headers })
   } catch (err) {

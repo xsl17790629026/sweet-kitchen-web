@@ -16,11 +16,11 @@ node server.js
 默认地址：http://localhost:8787  
 换端口：`PORT=3000 node server.js`
 
-打开首页即可创建厨房。厨房数据保存在 `data/` 目录，重启服务不会丢失。
+打开首页即可创建厨房。厨房数据保存在 `data/` 目录，菜品图片在 `data/images/`，重启服务不会丢失。
 
 ## 接口一览
 
-均返回 JSON。厨房令牌是 32 位十六进制，出现在链接 `/k/<token>` 里，不要公开列出。
+除图片下载外均返回 JSON。厨房令牌是 32 位十六进制，出现在链接 `/k/<token>` 里，不要公开列出。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -28,7 +28,9 @@ node server.js
 | POST | `/api/kitchens` | 创建厨房（写入默认 21 道菜），返回 token、code、shareUrl、完整状态 |
 | POST | `/api/kitchens/join` | 用邀请码加入，body：`{"code":"A3K7P2"}` |
 | GET | `/api/kitchens/:token` | 读取完整状态；可加 `?since=<updatedAt>`，无更新时返回 `{unchanged:true}` |
-| POST | `/api/kitchens/:token/dishes` | 新增或更新一道菜 |
+| POST | `/api/kitchens/:token/images` | 上传菜品图片（JSON，base64 或 data URL），返回 `{id,url}` |
+| GET | `/api/kitchens/:token/images/:id` | 读取图片二进制，带长期缓存 |
+| POST | `/api/kitchens/:token/dishes` | 新增或更新一道菜（可用 `image` 字段引用已上传的图片 id） |
 | DELETE | `/api/kitchens/:token/dishes/:id` | 删除菜谱 |
 | POST | `/api/kitchens/:token/dishes/restore` | 恢复默认 21 道菜 |
 | POST | `/api/kitchens/:token/cart` | 改点菜单。body：`{action:"change",id,delta}` / `{action:"notes",notes}` / `{action:"clear"}` |

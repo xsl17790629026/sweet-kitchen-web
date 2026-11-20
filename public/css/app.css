@@ -315,6 +315,14 @@ textarea { resize: vertical; }
   justify-content: center;
   font-size: 28px;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.dish-emoji img,
+.dish-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .dish-main { flex: 1; min-width: 0; }
 .dish-name { font-weight: 700; font-size: 16px; color: #4e342e; }
@@ -432,7 +440,27 @@ textarea { resize: vertical; }
 .order-time { font-size: 12px; color: #a1887f; }
 .order-items { background: #fff8f3; border-radius: 10px; padding: 6px 12px; }
 .order-item { display: flex; align-items: center; padding: 6px 0; font-size: 14px; }
-.order-item .em { width: 24px; }
+.order-item .em {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.order-item .em-photo {
+  border-radius: 6px;
+  background: #fff1eb;
+}
+.order-item .em img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 6px;
+}
 .order-item .nm { flex: 1; }
 .order-item .qt { color: #8d6e63; }
 .order-notes {
@@ -523,6 +551,53 @@ textarea { resize: vertical; }
 }
 .head-center { text-align: center; padding: 12px 0 8px; }
 .head-emoji { font-size: 56px; }
+.head-photo {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 8px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff1eb;
+}
+.head-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-picker {
+  display: flex;
+  align-items: center;
+}
+.photo-preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  background: #fff1eb;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 36px;
+}
+.photo-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-actions {
+  margin-left: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.photo-actions .btn { width: auto; }
+.photo-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #a1887f;
+}
 .section-title { font-size: 16px; font-weight: 700; margin: 0 0 10px; }
 .ing, .step-row { display: flex; align-items: flex-start; padding: 6px 0; }
 .dot { color: #e85d4c; width: 22px; flex-shrink: 0; text-align: center; }

@@ -16,7 +16,7 @@ const ROOT = __dirname
 const PUBLIC_DIR = path.join(ROOT, 'public')
 const DATA_DIR = path.join(ROOT, 'data')
 const PORT = parseInt(process.env.PORT, 10) || 8787
-const MAX_BODY = 200 * 1024
+const MAX_BODY = 2.2 * 1024 * 1024
 
 const store = createFsStore(DATA_DIR)
 
@@ -44,6 +44,14 @@ function send(res, status, headers, body) {
 
 function sendJson(res, result) {
   send(res, result.status, result.headers, JSON.stringify(result.body))
+}
+
+function sendResult(res, result) {
+  if (result && result.raw) {
+    send(res, result.status, result.headers, result.body)
+    return
+  }
+  sendJson(res, result)
 }
 
 function requestOrigin(req) {
@@ -167,7 +175,7 @@ const server = http.createServer(async function (req, res) {
         ip: clientIp(req),
         origin: requestOrigin(req)
       }, store)
-      sendJson(res, result)
+      sendResult(res, result)
     } catch (err) {
       const status = err && err.status ? err.status : 500
       sendJson(res, {
