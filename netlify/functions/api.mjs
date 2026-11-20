@@ -6,11 +6,10 @@ const require = createRequire(import.meta.url)
 const { handleApi } = require('../../lib/api')
 const { createBlobStore } = require('../../lib/store-blobs')
 
-let store
-
 export default async (req, context) => {
   try {
-    if (!store) store = createBlobStore()
+    // 每次请求都新建存储连接：平台给的访问凭证只对当前请求有效，缓存下来会过期
+    const store = createBlobStore()
     const url = new URL(req.url)
     const query = Object.fromEntries(url.searchParams)
     let body = {}
