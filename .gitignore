@@ -1,0 +1,10 @@
+node_modules/
+data/kitchens/*.json
+data/codes.json
+data/*.tmp
+*.tmp
+.DS_Store
+.netlify/
+
+codeberg-token
+.env

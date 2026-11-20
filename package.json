@@ -1,0 +1,12 @@
+{
+  "name": "sweet-kitchen-web",
+  "private": true,
+  "description": "甜蜜厨房网页版：点菜、下厨、两人实时同步",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
